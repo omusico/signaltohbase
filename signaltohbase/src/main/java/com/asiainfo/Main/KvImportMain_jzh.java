@@ -24,6 +24,7 @@ import com.asiainfo.Util.Log4JUtil;
 public class KvImportMain_jzh {
 	private static Logger LOG = Log4JUtil.getLogger(KvImportMain_jzh.class);
 	
+	String aaa ="1";
 	BufferedReader br = null;
 	BufferedWriter bw = null;
 
