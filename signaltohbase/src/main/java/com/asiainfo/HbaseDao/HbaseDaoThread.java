@@ -2,9 +2,12 @@ package com.asiainfo.HbaseDao;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -16,12 +19,13 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import org.apache.hadoop.hbase.client.*;
+
+import com.asiainfo.Bean.GetResultMaps;
+import com.asiainfo.Bean.UpDelTrans;
+import com.asiainfo.Main.HbaseMain;
 import com.asiainfo.Util.TimeFormat;
 
 
@@ -33,30 +37,32 @@ public class HbaseDaoThread{
 		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
 		ArrayList<Future> list = new ArrayList<Future>(); 
 
-		Set<String> mdnSet = new HashSet<String>();
-		ArrayList<Set<String>> allset = new ArrayList<Set<String>>();
+		List<String> mdnArrayList = new ArrayList<String>();
+		ArrayList<HashSet<String>> allArrayList = new ArrayList<HashSet<String>>();
 		Set<HashMap<String, byte[]>> splitMapList = new HashSet<HashMap<String, byte[]>>();
 		HashMap<String,byte[]> allMapList = new HashMap<String, byte[]>();
-		
+
 		for(int i=0;i<taskSize;i++){
-			allset.add(new HashSet<String>());
+			allArrayList.add(new HashSet<String>());
 		}
-		
+
 		for(String rowKey:rowKeys){
-			mdnSet.add(rowKey.split("\\^")[0]);
+			mdnArrayList.add(rowKey.split("\\^")[0]);
 		}
 		
-		int taskSizeNum = (mdnSet.size()/taskSize)+1;
+		Collections.sort(mdnArrayList);
+
+		int taskSizeNum = (mdnArrayList.size()/taskSize)+1;
 
 		int mdncount=0;
-		for(String mdn:mdnSet){
-			allset.get(mdncount/taskSizeNum).add(mdn);
+		for(String mdn:mdnArrayList){
+			allArrayList.get(mdncount/taskSizeNum).add(mdn);
 			mdncount++;
 		}
-		
+
 		CountDownLatch latch =new CountDownLatch(taskSize);
 		for(int i=0;i<taskSize;i++){
-			Callable c = new MyCallableget(latch, tableName , allset.get(i)); 
+			Callable c = new MyCallableget(latch, tableName , allArrayList.get(i)); 
 			Future f = pool.submit(c);  
 			list.add(f);  
 		}
@@ -81,6 +87,139 @@ public class HbaseDaoThread{
 		return allMapList;
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public GetResultMaps HbaseGetternew(String tableName,List<String[]> upValueList){
+		long timec = System.currentTimeMillis();
+		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
+		ArrayList<Future> list = new ArrayList<Future>(); 
+
+		List<String> mdnArrayList = new ArrayList<String>();
+		ArrayList<List<String>> allArrayList = new ArrayList<List<String>>();
+		Set<GetResultMaps> splitMapList = new HashSet<GetResultMaps>();
+		GetResultMaps getAllResultMaps = new GetResultMaps();
+		HashMap<String,byte[]> allMapList = new HashMap<String, byte[]>();
+		HashMap<String,byte[]> allRoamMapList = new HashMap<String, byte[]>();
+
+		for(int i=0;i<taskSize;i++){
+			allArrayList.add(new ArrayList<String>());
+		}
+
+		for(String[] upValue:upValueList){
+			mdnArrayList.add(upValue[0]);
+		}
+
+		int taskSizeNum = (mdnArrayList.size()/taskSize)+1;
+
+		int mdncount=0;
+		for(String mdn:mdnArrayList){
+			allArrayList.get(mdncount/taskSizeNum).add(mdn);
+			mdncount++;
+		}
+		CountDownLatch latch =new CountDownLatch(taskSize);
+		
+		long timea = System.currentTimeMillis();
+		//System.out.println(Thread.currentThread().getName()+" a : "+10000*(timea-timec)/HbaseMain.batch);
+		for(int i=0;i<taskSize;i++){
+			Callable c = new MyCallableget_Version1_2(latch, tableName , allArrayList.get(i)); 
+			Future f = pool.submit(c);  
+			list.add(f);  
+		}
+		pool.shutdown();
+		try {
+			latch.await();
+		} catch (InterruptedException e1) {
+			e1.printStackTrace();
+		}
+		long timeb = System.currentTimeMillis();
+		//System.out.println(Thread.currentThread().getName()+" b : "+10000*(timeb-timea)/HbaseMain.batch);
+		for(Future f:list){
+			try {
+				splitMapList.add((GetResultMaps)f.get());
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		for(GetResultMaps getResultMaps:splitMapList){
+			allMapList.putAll(getResultMaps.getResultMap());
+			allRoamMapList.putAll(getResultMaps.getRoamResultMap());
+		}
+		getAllResultMaps.setResultMap(allMapList);
+		getAllResultMaps.setRoamResultMap(allRoamMapList);
+		long timed = System.currentTimeMillis();
+		//System.out.println(Thread.currentThread().getName()+" c : "+10000*(timed-timeb)/HbaseMain.batch);
+		return getAllResultMaps;
+	}
+	
+	private class MyCallableget_Version1_2 implements Callable<Object> {
+		private List<String> rowKeys;
+		private String tableName;
+		private Result[] results;
+		private CountDownLatch latch;
+		private ArrayList<Get> GetList = new ArrayList<Get>();
+//		private ArrayList<Get> GetListExist = new ArrayList<Get>();
+		private HashMap<String, byte[]> resultMap = new HashMap<String, byte[]>();
+		private HashMap<String, byte[]> roamResultMap = new HashMap<String, byte[]>();
+	
+		public MyCallableget_Version1_2(CountDownLatch latch,String tableName ,List<String> rowKeys) {
+			this.latch = latch;
+			this.rowKeys = rowKeys;
+			this.tableName = tableName;
+		}
+		
+		public Object call(){
+			try {
+				long timea = System.currentTimeMillis();
+				Table hTable = HbasePool.getHtable(tableName);
+
+				for(String rowKey:rowKeys){
+					Get get = new Get(Bytes.toBytes(rowKey.split("\\^")[0]));
+					get.addFamily(HbaseInput.BYTE_f);
+					GetList.add(get);
+				}
+				long timeb = System.currentTimeMillis();
+				//System.out.println(Thread.currentThread().getName()+" 111 : "+10000*(timeb-timea)/HbaseMain.batch);
+//				boolean[] booleans = hTable.existsAll(GetList);
+//				long timec = System.currentTimeMillis();
+//				System.out.println(Thread.currentThread().getName()+" 222 : "+10000*(timec-timeb)/HbaseMain.batch);
+//				for(int i=0;i<GetList.size();i++){
+//					if(booleans[i]){
+//						GetListExist.add(GetList.get(i));
+//					}else{
+//						resultMap.put(new String(GetList.get(i).getRow()),null);
+//						roamResultMap.put(new String(GetList.get(i).getRow()),null);
+//					}
+//				}
+				
+				long timed = System.currentTimeMillis();
+				//System.out.println(Thread.currentThread().getName()+" 333 : "+10000*(timed-timeb)/HbaseMain.batch);
+				results = hTable.get(GetList);
+				long timee = System.currentTimeMillis();
+				//System.out.println(Thread.currentThread().getName()+" 444 : "+10000*(timee-timed)/HbaseMain.batch);
+
+				hTable.close();
+				
+				for(Result result:results){
+					if(result.getRow()!=null){
+						resultMap.put(new String(result.getRow()),result.getValue(HbaseInput.BYTE_f, HbaseInput.BYTE_rts));
+						roamResultMap.put(new String(result.getRow()),result.getValue(HbaseInput.BYTE_f, HbaseInput.BYTE_rtrs));
+					}
+				}	
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			latch.countDown();
+			GetResultMaps getResultMaps = new GetResultMaps();
+			getResultMaps.setResultMap(resultMap);
+			getResultMaps.setRoamResultMap(roamResultMap);
+			
+			return getResultMaps;
+		}
+	}
+	
 	private class MyCallableget implements Callable<Object> {
 		private Set<String> rowKeys;
 		private String tableName;
@@ -97,16 +236,19 @@ public class HbaseDaoThread{
 		
 		public Object call(){
 			try {
-				HTableInterface hTable = HbasePool.getHtable(tableName);
+				HbaseDao hbaseDao = new HbaseDao();
+				Map<String, HTableInterface> htInterfaces = hbaseDao.MyInit(new String[]{tableName});
+				HTableInterface hTable = htInterfaces.get(tableName);
 				for(String rowKey:rowKeys){
-					GetList.add(new Get(Bytes.toBytes(rowKey.split("\\^")[0])));
+					Get getTmp = new Get(Bytes.toBytes(rowKey.split("\\^")[0]));
+					GetList.add(getTmp);
 				}
 				results = hTable.get(GetList);
 				hTable.close();
 			
 			for(Result result:results){
-				if(result.getValue(HbaseInput.F_byte, HbaseInput.RTS_byte)!=null){
-					resultMap.put(new String(result.getRow()),result.getValue(HbaseInput.F_byte, HbaseInput.RTS_byte));
+				if(result.getValue(HbaseInput.BYTE_f, HbaseInput.BYTE_rts)!=null){
+					resultMap.put(new String(result.getRow()),result.getValue(HbaseInput.BYTE_f, HbaseInput.BYTE_rts));
 				}
 			}			
 			} catch (IOException e) {
@@ -177,17 +319,17 @@ public class HbaseDaoThread{
 		public Object call(){
 			try {
 				
-				HTableInterface htInterface = HbasePool.getHtable(tableName);
+				HTableInterface htInterface = HbasePoolOld.getHtable(tableName);
                 
 				for(String line:lines){
 					String[] lineparas = line.split("\\^",-1);
 					String id = lineparas[0];
-					String lacci = lineparas[1] + HbaseInput.lacci_split + lineparas[2];
+					String lacci = lineparas[1] + HbaseInput.STRING_laccisplit + lineparas[2];
 					
 					long time = Long.parseLong(lineparas[3])*60*1000;
 					
 					Get get = new Get(Bytes.toBytes(lacci));
-					get.addFamily(HbaseInput.F_byte);
+					get.addFamily(HbaseInput.BYTE_f);
 					long current = System.currentTimeMillis();
 					get.setTimeRange(current-time, current);
 					
@@ -275,15 +417,15 @@ public class HbaseDaoThread{
 		
 		public Object call(){
 			try {
-				HTableInterface htInterface = HbasePool.getHtable(tableName);
+				HTableInterface htInterface = HbasePoolOld.getHtable(tableName);
 				for(String line:lines){
 					String[] lineparas = line.split("\\^",-1);
 					String id = lineparas[0];
-					String lacci = lineparas[1] + HbaseInput.lacci_split + lineparas[2];
+					String lacci = lineparas[1] + HbaseInput.STRING_laccisplit + lineparas[2];
 					long time = Long.parseLong(lineparas[3])*60*1000;
 					
 					Get get = new Get(Bytes.toBytes(lacci));
-					get.addFamily(HbaseInput.F_byte);
+					get.addFamily(HbaseInput.BYTE_f);
 					long current = System.currentTimeMillis();
 					get.setTimeRange(current-time, current);
 					
@@ -308,32 +450,32 @@ public class HbaseDaoThread{
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public void HbasePutter(String tableName,String tableindexName,Set<String[]> rowKeys){
+	public void HbasePutter(String tableName,String qualifier,String tableindexName,Map<String,String> rowKeys){
 		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
 		ArrayList<Future> list = new ArrayList<Future>(); 
 
-		Set<String[]> mdnSet = new HashSet<String[]>();
-		ArrayList<Set<String[]>> allset = new ArrayList<Set<String[]>>();
+		Set<Entry<String, String>> mdnSet = new HashSet<Entry<String, String>>();
+		ArrayList<Set<Entry<String, String>>> allset = new ArrayList<Set<Entry<String, String>>>();
 		
 		for(int i=0;i<taskSize;i++){
-			allset.add(new HashSet<String[]>());
+			allset.add(new HashSet<Entry<String, String>>());
 		}
 		
-		for(String[] rowKey : rowKeys){
+		for(Entry rowKey : rowKeys.entrySet()){
 			mdnSet.add(rowKey);
 		}
 		
 		int taskSizeNum = (mdnSet.size()/taskSize)+1;
 
 		int mdncount=0;
-		for(String[] mdn:mdnSet){
+		for(Entry<String, String> mdn:mdnSet){
 			allset.get(mdncount/taskSizeNum).add(mdn);
 			mdncount++;
 		}
 		
 		CountDownLatch latch =new CountDownLatch(taskSize);
 		for(int i=0;i<taskSize;i++){
-			Callable c = new MyCallableput(latch,tableName,tableindexName, allset.get(i)); 
+			Callable c = new MyCallableput(latch,tableName,qualifier,tableindexName, allset.get(i)); 
 			Future f = pool.submit(c);  
 			list.add(f);  
 		}
@@ -347,29 +489,36 @@ public class HbaseDaoThread{
 	}
 	
 	private class MyCallableput implements Callable<Object> {
-		private Set<String[]> rowKeys;
+		private Set<Entry<String, String>> rowKeys;
 		private String tableName;
+		private String qualifier;
 		private String tableindexName;
 		private CountDownLatch latch;
 	
-		public MyCallableput(CountDownLatch latch,String tableName,String tableindexName,Set<String[]> rowKeys) {
+		public MyCallableput(CountDownLatch latch,String tableName,String qualifier,String tableindexName,Set<Entry<String, String>> rowKeys) {
 			this.latch = latch;
 			this.rowKeys = rowKeys;
 			this.tableName = tableName;
+			this.qualifier = qualifier;
 			this.tableindexName = tableindexName;
 		}
 		
 		public Object call(){
 		
 			HbaseDao hbaseDao = new HbaseDao();
-			HTableInterface[] htInterfaces = hbaseDao.MyInit(new String[]{tableName,tableindexName});
-			for(String[] rowkey:rowKeys){
-				long ts = new TimeFormat().Date2long(rowkey[3]);
-				hbaseDao.putRow(htInterfaces[0], rowkey[0], HbaseInput.f, HbaseInput.rts, rowkey[2], ts);
-				hbaseDao.putRow(htInterfaces[1], rowkey[1], HbaseInput.f, rowkey[0], rowkey[2].split(",",-1)[0], ts);	
+			Map<String, HTableInterface> htInterfaces = hbaseDao.MyInit(new String[]{tableName,tableindexName});
+
+			for(Entry<String,String> rowkey:rowKeys){
+				String Mdn = rowkey.getKey();
+				String Value = rowkey.getValue();
+				String[] finDatas = Value.split(",", -1);
+				String lacci = finDatas[2]+HbaseInput.STRING_laccisplit+finDatas[3];
+				long ts = new TimeFormat().Date2long(finDatas[9]);
+				hbaseDao.putRow(htInterfaces.get(tableName), Mdn, HbaseInput.STRING_f, qualifier, Value, ts);
+				hbaseDao.putRow(htInterfaces.get(tableindexName), lacci, HbaseInput.STRING_f, Mdn, Value.split(",",-1)[0], ts);	
 			}
-			hbaseDao.MyBufferFlush(htInterfaces);
-			hbaseDao.MyClose(htInterfaces);
+			hbaseDao.MyBufferFlush(new ArrayList<HTableInterface>(htInterfaces.values()));
+			hbaseDao.MyClose(new ArrayList<HTableInterface>(htInterfaces.values()));
 			latch.countDown();
 			return null;
 		}
@@ -377,7 +526,7 @@ public class HbaseDaoThread{
 	
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public void Hbasedelete(String tableindexName,ArrayList<Delete> DeleteSet){
+	public void Hbasedelete(String tableName,List<UpDelTrans> updelTransList){
 		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
 		ArrayList<Future> list = new ArrayList<Future>(); 
 
@@ -388,7 +537,65 @@ public class HbaseDaoThread{
 			allSet.add(new ArrayList<Delete>());
 		}
 		
-		for(Delete delete : DeleteSet){
+		for(UpDelTrans updelTrans:updelTransList){
+			String[] DelStringArray = null;
+			if(tableName.endsWith("signalindex")){
+//				DelStringArray = updelTrans.getDelTableIndex();
+			}else if(tableName.endsWith("signal")){
+//				DelStringArray = updelTrans.getDelTableAnother();
+			}
+			if(DelStringArray!=null){
+				Delete delete = new Delete(Bytes.toBytes(DelStringArray[0]));
+				delete.deleteColumns(HbaseInput.BYTE_f, Bytes.toBytes(DelStringArray[1]));
+				delete.setDurability(Durability.SKIP_WAL);
+				oneSet.add(delete);
+			}
+		}
+		
+		int taskSizeNum = (oneSet.size()/taskSize)+1;
+
+		int count=0;
+		for(Delete one:oneSet){
+			allSet.get(count/taskSizeNum).add(one);
+			count++;
+		}
+		
+		CountDownLatch latch =new CountDownLatch(taskSize);
+		for(int i=0;i<taskSize;i++){
+			Callable c = new MyCallabledelete(latch,tableName, allSet.get(i)); 
+			Future f = pool.submit(c);  
+			list.add(f);  
+		}
+		try {
+			latch.await();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		pool.shutdown();
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public void Hbasedelete(String tableName,Map<String,String> DeleteSet){
+		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
+		ArrayList<Future> list = new ArrayList<Future>(); 
+
+		Set<Delete> oneSet = new HashSet<Delete>();
+		ArrayList<ArrayList<Delete>> allSet = new ArrayList<ArrayList<Delete>>();
+		
+		for(int i=0;i<taskSize;i++){
+			allSet.add(new ArrayList<Delete>());
+		}
+		
+		for(Entry<String,String> deleteEntry : DeleteSet.entrySet()){
+			Delete delete = null;
+			if(tableName.endsWith("signal")){
+				delete = new Delete(Bytes.toBytes(deleteEntry.getKey()));
+				delete.addColumn(HbaseInput.BYTE_f, Bytes.toBytes(deleteEntry.getValue()));
+			}else if(tableName.endsWith("index")){
+				delete = new Delete(Bytes.toBytes(deleteEntry.getValue()));
+				delete.addColumn(HbaseInput.BYTE_f, Bytes.toBytes(deleteEntry.getKey()));
+			}
+			delete.setDurability(Durability.SKIP_WAL);
 			oneSet.add(delete);
 		}
 		
@@ -402,7 +609,7 @@ public class HbaseDaoThread{
 		
 		CountDownLatch latch =new CountDownLatch(taskSize);
 		for(int i=0;i<taskSize;i++){
-			Callable c = new MyCallabledelete(latch,tableindexName, allSet.get(i)); 
+			Callable c = new MyCallabledelete(latch,tableName, allSet.get(i)); 
 			Future f = pool.submit(c);  
 			list.add(f);  
 		}
@@ -416,24 +623,33 @@ public class HbaseDaoThread{
 	
 	private class MyCallabledelete implements Callable<Object> {
 		private ArrayList<Delete> rowKeys;
-		private String tableindexName;
+		private String tableName;
 		private CountDownLatch latch;
 		private HashMap<String, byte[]> resultMap = new HashMap<String, byte[]>();
 	
 		public MyCallabledelete(CountDownLatch latch,String tableindexName,ArrayList<Delete> rowKeys) {
 			this.latch = latch;
 			this.rowKeys = rowKeys;
-			this.tableindexName = tableindexName;
+			this.tableName = tableindexName;
 		}
 		
 		public Object call(){
-			HTableInterface htable = HbasePool.getHtable(tableindexName);
-			try {
+			Map<String, HTableInterface> htInterfaces = new HbaseDao().MyInit(new String[]{tableName});
+			HTableInterface htable = htInterfaces.get(tableName);
+				try {
 				htable.delete(rowKeys);
 				htable.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+			
+//			Table htable = HbasePool.getHtable(tableName);
+//			try {
+//				htable.delete(rowKeys);
+//				htable.close();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
 			latch.countDown();
 			return resultMap;
 		}

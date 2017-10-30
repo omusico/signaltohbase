@@ -4,6 +4,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.asiainfo.Bean.UpDelTrans;
 import com.asiainfo.Main.HbaseMain;
 import com.asiainfo.Util.Constants;
 import com.asiainfo.Util.DataFormat;
@@ -60,47 +61,69 @@ public class KafkaMyConsumer extends Thread {
 	        ConsumerIterator<byte[], byte[]> iterator = stream.iterator();  
 	        while (iterator.hasNext()) { 
 				MessageAndMetadata<byte[], byte[]> mam = iterator.next();
-				String data = SignalExe(new String(mam.message()));
-				if(!(data==null || data.equals(""))){
+
+				String[] upValue = SignalExe(new String(mam.message()));
+				if(upValue!=null && !("").equals(upValue[0])  && !("").equals(upValue[1])){
 					HbaseMain.lock.lock();
 			        try {	
 							while(HbaseMain.dataList.size() >= HbaseMain.batch){
 				                HbaseMain.notEmpty.signalAll();//唤醒消费线程
 				                HbaseMain.notFull.await();//阻塞生产线程
 							}
-							HbaseMain.dataList.add(data);    
+							HbaseMain.dataList.add(upValue);    
 			        }  catch (InterruptedException e) {
 						e.printStackTrace();
 					}finally{
 				    	HbaseMain.lock.unlock();	
 			        }
 				}
+					
+					
+//				String data = SignalExe(new String(mam.message()));	
+//				if(!(data==null || data.equals("")||data.equals(",local")||data.equals(",roam"))){
+//					HbaseMain.lock.lock();
+//			        try {	
+//							while(HbaseMain.dataList.size() >= HbaseMain.batch){
+//				                HbaseMain.notEmpty.signalAll();//唤醒消费线程
+//				                HbaseMain.notFull.await();//阻塞生产线程
+//							}
+//							HbaseMain.dataList.add(data);    
+//			        }  catch (InterruptedException e) {
+//						e.printStackTrace();
+//					}finally{
+//				    	HbaseMain.lock.unlock();	
+//			        }
+//				}
 	        }
 		}
 	}
 	
-	private String SignalExe(String message) {
+	private String[] SignalExe(String message) {
 		DataFormat dataFormat = new DataFormat();
-		if ((HbaseMain.TOPIC_CS_LOC_SIGNAL).equals(topic)) {
+		if ((HbaseMain.TOPIC_CS_LOC_SIGNAL).equals(topic)) { 
 			return dataFormat.CS_insert(Constants.LOCSIGNAL, message);
-
+			
 		} else if ((HbaseMain.TOPIC_CS_SMS_SIGNAL).equals(topic)) {
 			return dataFormat.CS_insert(Constants.SMSSIGNAL, message);
 
 		} else if ((HbaseMain.TOPIC_CS_VOC_SIGNAL).equals(topic)) {
 			return dataFormat.CS_insert(Constants.VOCSIGNAL, message);
 
-		} else if ((HbaseMain.TOPIC_PS_SIGNAL).equals(topic)) {
+		} else if ((HbaseMain.TOPIC_PS_SIGNAL).equals(topic)) { 
 			return dataFormat.PS_insert(message);
+			
+		} else if ((HbaseMain.TOPIC_PS_ROAM_SIGNAL).equals(topic)){
+			return dataFormat.PS_roam_insert(message);
+			
 		}
-		return "";
+		return null;
 	}
 	
 
 	private ConsumerConnector createConsumer() {
 		Properties properties = new Properties();
-		properties.put("zookeeper.connect", "132.151.46.79:2181");// 声明zk
-		properties.put("group.id", "signal_hbase");// 不同的group维护不同的offset
+		properties.put("zookeeper.connect", "192.168.2.48:2181,192.168.2.68:2181,192.168.1.14:2181");// 声明zk
+		properties.put("group.id", "signal_hbase_test_7");// 不同的group维护不同的offset
 		properties.put("auto.commit.interval.ms", "1000");// 该参数尽量不小于写满WRITEBUFFERSIZE所需的时间
 		return Consumer.createJavaConsumerConnector(new ConsumerConfig(properties));
 	}

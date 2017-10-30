@@ -9,75 +9,66 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.MasterNotRunningException;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.ZooKeeperConnectionException;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Durability;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.filter.SubstringComparator;
-import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
-import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Bytes; 
 
 public class HbaseDao {
 	public static Configuration conf = HBaseConfiguration.create();
 	public static ArrayList<Put> puts = new ArrayList<Put>();
 	
-	public final static String TABLE_NAME = "ZJLT:signal";
-	public final static String TABLE_NAME_INDEX = "ZJLT:signalindex";
-	public final static long WRITEBUFFERSIZE = 3*1024*1024;
+	public final static String TABLE_NAME = "ZJBDP:signal";
+	public final static String TABLE_NAME_INDEX = "ZJBDP:signalindex";
+	public final static String TABLE_ROAM_NAME = "ZJBDP:roamsignal";
+	public final static String TABLE_ROAM_NAME_INDEX = "ZJBDP:roamsignalindex";
+	public final static long WRITEBUFFERSIZE = 5*1024*1024;
+	
+
 
 	static {
-		conf.set("hbase.zookeeper.quorum", "192.168.0.30,192.168.0.31,192.168.0.21,192.168.0.22,192.168.0.23");
+		conf.set("hbase.zookeeper.quorum", "ocdc-dn-03");
 		conf.set("hbase.zookeeper.property.clientPort", "2181");
 		conf.set("zookeeper.znode.parent", "/hbase-unsecure");
 	}
 
 	
-	public HTableInterface[] MyInit(String[] names){
-		HTableInterface MyhTable = null;
-		HTableInterface MyhTable_index = null;
-		try {
-			if(names.length==2){
-				MyhTable = HbasePool.getHtable(names[0]);
+	public Map<String,HTableInterface> MyInit(String[] tablenames){
+		HashMap<String, HTableInterface> MyhTables = new HashMap<String, HTableInterface>();
+
+		for(String tablename:tablenames){
+			HTableInterface MyhTable = null;
+			if(tablename.length()>0){
+				MyhTable = HbasePoolOld.getHtable(tablename);
 				MyhTable.setAutoFlush(false,false);
-				MyhTable.setWriteBufferSize(WRITEBUFFERSIZE);
+				try {
+					MyhTable.setWriteBufferSize(WRITEBUFFERSIZE);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
-				MyhTable_index = HbasePool.getHtable(names[1]);
-				MyhTable_index.setAutoFlush(false,false);
-				MyhTable_index.setWriteBufferSize(WRITEBUFFERSIZE);
+				MyhTables.put(tablename, MyhTable);
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
-		return new HTableInterface[]{MyhTable,MyhTable_index};
+
+		return MyhTables;
 	}
 	
 	
-	public void MyBufferFlush(HTableInterface[] htInterfaces){
-		try {
-			htInterfaces[0].flushCommits();
-			htInterfaces[1].flushCommits();
-		} catch (IOException e) {
-			e.printStackTrace();
+	public void MyBufferFlush(List<HTableInterface> htInterfaces){
+		for(HTableInterface htInterface:htInterfaces){
+//				htInterface.flushCommits();
 		}
 	}
 	
-	public void MyClose(HTableInterface[] htInterfaces){
+	public void MyClose(List<HTableInterface> htInterfaces){
 		try {
-			htInterfaces[0].close();
-			htInterfaces[1].close();
+			for(HTableInterface htInterface:htInterfaces){
+				htInterface.close();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -87,7 +78,7 @@ public class HbaseDao {
 			throws MasterNotRunningException, ZooKeeperConnectionException, IOException {
 		HBaseAdmin admin = new HBaseAdmin(conf);
 		if (admin.tableExists(tablename)) {
-			System.out.println("Table exists!");
+			System.out.println("HTableInterface exists!");
 		} else {
 			HTableDescriptor tableDesc = new HTableDescriptor(TableName.valueOf(tablename));
 			for (String columnFamily : columnFamilies) {
@@ -96,9 +87,9 @@ public class HbaseDao {
 			admin.createTable(tableDesc);
 
 			if (admin.tableExists(tablename)) {
-				System.out.println("create table success!");
+				System.out.println("create HTableInterface success!");
 			} else {
-				System.out.println("create table failed!");
+				System.out.println("create HTableInterface failed!");
 			}
 		}
 		admin.close();
@@ -120,11 +111,11 @@ public class HbaseDao {
 		putRow(htable, rowKey, columnFamily, key, value, ts);
 	}
 	
-	public Result getRow(HTableInterface table, String rowKey) {
+	public Result getRow(HTableInterface HTableInterface, String rowKey) {
 		Get get = new Get(Bytes.toBytes(rowKey));
 		Result result = null;
 		try {
-			result = table.get(get);
+			result = HTableInterface.get(get);
 			result.listCells();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -133,7 +124,7 @@ public class HbaseDao {
 	}
 	
 	public Map<String, Long> getSizeBatch(String index,List<String> lacciList){
-		HTableInterface table = HbasePool.getHtable(index);
+		HTableInterface HTableInterface = HbasePoolOld.getHtable(index);
 		byte[] family = Bytes.toBytes("f");
 		List<Get> getList = new ArrayList<Get>();
 		for(String lacci:lacciList){
@@ -141,7 +132,7 @@ public class HbaseDao {
 		}
 		Map<String, Long> SectionResult = new HashMap<String,Long>();
 		try {
-			Result[] results = table.get(getList);
+			Result[] results = HTableInterface.get(getList);
 			for(Result result:results){
 				if(result.getRow()!=null){
 					SectionResult.put(new String(result.getRow()),new Long((long)result.size())); 
@@ -159,12 +150,12 @@ public class HbaseDao {
 	}
 	
 	public long getsize(String name,String rowKey){
-		HTableInterface table = HbasePool.getHtable(name);
+		HTableInterface HTableInterface = HbasePoolOld.getHtable(name);
 		Get get = new Get(Bytes.toBytes(rowKey));
 		get.addFamily(Bytes.toBytes("f"));
 		Result result = null;
 		try {
-			result = table.get(get);
+			result = HTableInterface.get(get);
 			return (result.listCells().size());
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -173,7 +164,7 @@ public class HbaseDao {
 	}
 
 	public Map<String, byte[]> getRowBatch(String tableName, Set<String> rowKeys) {
-		HTableInterface htable = HbasePool.getHtable(tableName);
+		HTableInterface htable = HbasePoolOld.getHtable(tableName);
 		ArrayList<Get> GetList = new ArrayList<Get>();
 		Map<String, byte[]> ResultMap = new LinkedHashMap<String, byte[]>();
 		Result[] results = null;
@@ -188,7 +179,7 @@ public class HbaseDao {
 		}
 		int i = 0;
 		for(String rowKey:rowKeys){
-			ResultMap.put(rowKey.split("\\^")[0],results[i].getValue(HbaseInput.F_byte, HbaseInput.RTS_byte));
+			ResultMap.put(rowKey.split("\\^")[0],results[i].getValue(HbaseInput.BYTE_f, HbaseInput.BYTE_rts));
 			i++;
 		}
 		return ResultMap;
@@ -198,7 +189,7 @@ public class HbaseDao {
 
 	public void delete(String tableName, ArrayList<Delete> deletes) {
 		try {
-			HTableInterface htable = HbasePool.getHtable(tableName);
+			HTableInterface htable = HbasePoolOld.getHtable(tableName);
 			htable.delete(deletes);
 			htable.close();
 		} catch (IOException e) {
@@ -206,7 +197,7 @@ public class HbaseDao {
 		}
 	}
 
-	public void delete(HTableInterface table, String rowKey, String family, String qualifier, String timestamp) {
+	public void delete(HTableInterface HTableInterface, String rowKey, String family, String qualifier, String timestamp) {
 		try {
 			// 准备删除数据
 			Delete delete = new Delete(Bytes.toBytes(rowKey));
@@ -221,13 +212,13 @@ public class HbaseDao {
 			}
 			// 进行数据删除
 
-			table.delete(delete);
+			HTableInterface.delete(delete);
 		} catch (Exception e) {
 
 		}
 	}
 
-	public ResultScanner getRow_SubstringComparator(HTable table, String cf, String column, String Substring)
+	public ResultScanner getRow_SubstringComparator(HTable HTableInterface, String cf, String column, String Substring)
 			throws IOException {
 		SubstringComparator comp = new SubstringComparator(Substring);
 
@@ -236,17 +227,9 @@ public class HbaseDao {
 		Scan scan = new Scan();
 		scan.setFilter(filter);
 
-		ResultScanner rs = table.getScanner(scan);
+		ResultScanner rs = HTableInterface.getScanner(scan);
 		return rs;
 	}
 
-	// public static void main(String[] args) throws IOException {
-	//// putRow(hTable, "123456","all","time","111,222,333");
-	// HTable hTable = new HTable(conf, "ZJLT:test");
-	// Result result = new HbaseDao().getRow(hTable,"123456");
-	// byte[] bt = result.getValue("all".getBytes(), "time".getBytes());
-	// System.out.println(result.isEmpty());
-	// System.out.println("!"+new String(bt)+"!");
-	// }
 
 }

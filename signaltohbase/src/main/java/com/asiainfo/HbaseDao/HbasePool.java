@@ -4,52 +4,66 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HConnection;
-import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.BufferedMutator;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Table;
 
 public class HbasePool {
-
-	public static HConnection hConnection = null;
+	
+	public static Connection connection = null;
 	private static Configuration configuration = null;
 
 	static {
-		configuration = HBaseConfiguration.create();
-		configuration.set("hbase.zookeeper.quorum", "192.168.0.30,192.168.0.31,192.168.0.21,192.168.0.22,192.168.0.23");
+		configuration = HBaseConfiguration.create();		
+		configuration.set("hbase.zookeeper.quorum", "ocdc-dn-01,ocdc-dn-02,ocdc-dn-03,ocdc-dn-04,ocdc-dn-05");
 		configuration.set("zookeeper.znode.parent", "/hbase-unsecure");
 	}
-
-	public static HConnection getHTablePool() throws IOException {
-		if (hConnection == null) {
-			hConnection = HConnectionManager.createConnection(configuration);
+	
+	public static Connection getHTablePool() throws IOException {
+		if (connection == null) {
+			connection = ConnectionFactory.createConnection(configuration);  
 		}
-		return hConnection;
-	}
-
-	public static synchronized HTableInterface getHtable(){
-		return null;
+		return connection;
 	}
 	
-	
-	public static synchronized HTableInterface getHtable(String tableName) {
+	public static synchronized Table getHtable(String tableName) {
 		try {
-			HTableInterface tableInterface = null;
-			HConnection hConnection = HbasePool.getHTablePool();
+			Table table = null;
+			Connection connection = HbasePool.getHTablePool();
+			if (connection == null) {
+				System.out.println("no connection");
+			} else {
+				table = connection.getTable(TableName.valueOf(tableName));
+			}
+			return table;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	public static synchronized BufferedMutator getMutator(String tableName) {
+		try {
+			BufferedMutator mutator  = null;
+			Connection hConnection = HbasePool.getHTablePool();
 			if (hConnection == null) {
 				System.out.println("no connection");
 			} else {
-				tableInterface = hConnection.getTable(tableName);
+				mutator = hConnection.getBufferedMutator(TableName.valueOf(tableName));
 			}
-			return tableInterface;
+			return mutator;
 		} catch (Exception e) {
 			e.printStackTrace();
 			return null;
 		}
 	}
 
+
 	public static void closePool() {
 		try {
-			hConnection.close();
+			connection.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

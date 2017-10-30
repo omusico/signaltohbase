@@ -1,6 +1,7 @@
 package com.asiainfo.Util;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hbase.client.Delete;
@@ -8,13 +9,13 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import com.asiainfo.Bean.UpDelTrans;
 import com.asiainfo.HbaseDao.HbaseInput;
 
 public class DataFormat {
 	private ReentrantLock lock = new ReentrantLock();
 	public ArrayList<Get> getList = new ArrayList<Get>();
 
-	public ArrayList<Delete> DeleteSet = new ArrayList<Delete>(); 
 
 
 	// [start]constant
@@ -109,17 +110,60 @@ public class DataFormat {
 	 * 业务类型 被叫短信
 	 */
 	public static final int MT_SMS = 1;
+	
+	/**
+	 * PS域信令漫游记录
+	 */
+	public static final int PS_ROAM_MSIMDN = 0;
+	public static final int PS_ROAM_HOME_AREA_ID = 12;
+	public static final int PS_ROAM_ROAM_AREA_ID = 13;
+	public static final int PS_ROAM_LAC = 9;
+	public static final int PS_ROAM_CI = 10;
+	public static final int PS_ROAM_BTS_LON = 15;
+	public static final int PS_ROAM_BTS_LAT = 16;
+	public static final int PS_ROAM_IMSI = 1;
+	public static final int PS_ROAM_IMEI = 2;
+	public static final int PS_ROAM_TRANS_REQ_TIME_SEC = 8;
+	
 	// [end]
 
-	public String PS_insert(String message) {
+	
+	public String[] PS_roam_insert(String message){
+		StringBuffer PSsb = new StringBuffer();
+
+		String[] fields = message.split("\\^", -1);
+		if ((fields[PS_ROAM_MSIMDN] != null) && (!("").equals(fields[PS_ROAM_MSIMDN]))) {
+			String UpdateTime = new TimeFormat().long2String(fields[PS_ROAM_TRANS_REQ_TIME_SEC]);
+
+			PSsb.append(fields[PS_ROAM_HOME_AREA_ID]).append(",")
+			    .append(fields[PS_ROAM_ROAM_AREA_ID]).append(",")
+				.append(fields[PS_ROAM_LAC]).append(",")
+				.append(fields[PS_ROAM_CI]).append(",")
+				.append(fields[PS_ROAM_BTS_LON]).append(",")
+				.append(fields[PS_ROAM_BTS_LAT]).append(",")
+				.append(fields[PS_ROAM_IMSI]).append(",")
+				.append(fields[PS_ROAM_IMEI]).append(",")
+				.append(UpdateTime).append(",")
+				.append(UpdateTime);
+			
+//			List<String> upValue = new ArrayList<String>();
+//			upValue.add(fields[PS_ROAM_MSIMDN]);
+//			upValue.add(new String(PSsb));
+//			upValue.add("roam");
+			
+			return new String[]{fields[0],new String(PSsb),"roam"};
+		}
+		return null;
+	}
+	
+	public String[] PS_insert(String message) {
 		StringBuffer PSsb = new StringBuffer();
 
 		String[] fields = message.split("\\^", -1);
 		if ((fields[0] != null) && (!("").equals(fields[0]))) {
 			String UpdateTime = new TimeFormat().long2String(fields[8]);
 
-			PSsb.append(fields[0]).append(",")
-			    .append(fields[12]).append(",")
+			PSsb.append(fields[12]).append(",")
 			    .append(fields[14]).append(",")
 				.append(fields[9]).append(",")
 				.append(fields[10]).append(",")
@@ -129,10 +173,15 @@ public class DataFormat {
 				.append(fields[2]).append(",")
 				.append(UpdateTime).append(",")
 				.append(UpdateTime);
+
+//			List<String> upValue = new ArrayList<String>();
+//			upValue.add(fields[0]);
+//			upValue.add(new String(PSsb));
+//			upValue.add("local");
 			
-			return new String(PSsb);
+			return new String[]{fields[0],new String(PSsb),"local"};
 		}
-		return "";
+		return null;
 	}
 
 	/**
@@ -143,7 +192,7 @@ public class DataFormat {
 	 * @param signalData
 	 *            信令数据
 	 */
-	public String CS_insert(int signalType, String signalData) {
+	public String[] CS_insert(int signalType, String signalData) {
 		lock.lock();
 		try {
 			String[] fields = signalData.split(",", -1);
@@ -155,7 +204,7 @@ public class DataFormat {
 			case Constants.SMSSIGNAL:
 				return handleSms(signalType, fields);
 			default:
-				return "";
+				return null;
 			}
 		} finally {
 			lock.unlock();
@@ -170,7 +219,7 @@ public class DataFormat {
 	 * @param fields
 	 *            信令数据
 	 */
-	private String handleLoc(int signalType, String fields[]) {
+	private String[] handleLoc(int signalType, String fields[]) {
 		String enterTime = fields[LOC_START_TIME].trim();
 		String mdn = fields[LOC_MDN].trim();
 		String lac = fields[LOC_START_LAC].trim();
@@ -180,7 +229,7 @@ public class DataFormat {
 		if ("65535".equals(ci) || "".equals(ci)) {
 			ci = fields[LOC_END_CI].trim();
 			if ("65535".equals(ci) || "".equals(ci)) {
-				return "";
+				return null;
 			}
 
 			lac = fields[LOC_END_LAC].trim();
@@ -188,12 +237,16 @@ public class DataFormat {
 		}
 
 		if (mdn.equals("")) {
-			return "";
+			return null;
 		}
 
 		String endTime = fields[LOC_END_TIME].trim();
 
-		return mdn + "," + ExtractData.extractData(ExtractData.LOC, lac, ci, enterTime, endTime, fields);
+//		List<String> upValue = new ArrayList<String>();
+//		upValue.add(mdn);
+//		upValue.add(ExtractData.extractData(ExtractData.LOC, lac, ci, enterTime, endTime, fields));
+//		upValue.add("local");
+		return new String[]{mdn,ExtractData.extractData(ExtractData.LOC, lac, ci, enterTime, endTime, fields),"local"};
 	}
 
 	/**
@@ -204,7 +257,7 @@ public class DataFormat {
 	 * @param fields
 	 *            信令数据
 	 */
-	private String handleVoc(int signalType, String fields[]) {
+	private String[] handleVoc(int signalType, String fields[]) {
 		String enterTime = fields[VOC_START_TIME].trim();
 		String mdn = "";
 		String lac = fields[VOC_START_LAC].trim();
@@ -215,7 +268,7 @@ public class DataFormat {
 		if ("65535".equals(ci) || "".equals(ci)) {
 			ci = fields[VOC_END_CI].trim();
 			if ("65535".equals(ci) || "".equals(ci)) {
-				return "";
+				return null;
 			}
 
 			lac = fields[VOC_END_LAC].trim();
@@ -234,12 +287,16 @@ public class DataFormat {
 		}
 
 		if (mdn.equals("")) {
-			return "";
+			return null;
 		}
 
 		String endTime = fields[VOC_END_TIME].trim();
-
-		return mdn + "," + ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields);
+		
+//		List<String> upValue = new ArrayList<String>();
+//		upValue.add(mdn);
+//		upValue.add(ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields));
+//		upValue.add("local");
+		return new String[]{mdn,ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields),"local"};
 	}
 
 	/**
@@ -250,7 +307,7 @@ public class DataFormat {
 	 * @param fields
 	 *            信令数据
 	 */
-	private String handleSms(int signalType, String fields[]) {
+	private String[] handleSms(int signalType, String fields[]) {
 		String enterTime = fields[SMS_START_TIME].trim();
 		String mdn = "";
 		String lac = fields[SMS_START_LAC].trim();
@@ -259,7 +316,7 @@ public class DataFormat {
 
 		// 如果start_ci不合法，则使用end_ci
 		if ("65535".equals(ci) || "".equals(ci)) {
-			return "";
+			return null;
 		}
 
 		int extraType = ExtractData.SMS_MO;
@@ -272,35 +329,49 @@ public class DataFormat {
 			mdn = fields[SMS_MT_MDN].trim();
 			extraType = ExtractData.SMS_MT;
 		} else {
-			return "";
+			return null;
 		}
 
 		if (mdn.equals("")) {
-			return "";
+			return null;
 		}
 
 		String endTime = fields[SMS_END_TIME].trim();
 
-		return  mdn + "," + ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields);
+//		List<String> upValue = new ArrayList<String>();
+//		upValue.add(mdn);
+//		upValue.add(ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields));
+//		upValue.add("local");
+
+		return new String[]{mdn,ExtractData.extractData(extraType, lac, ci, enterTime, endTime, fields),"local"};
 	}
 
-	public String compareData(String data, String result) {
-		String[] datas = data.split(",", -1);
+	public UpDelTrans compareData(String[] upValue, String result ,String TableName) {
+		UpDelTrans upDelTrans = new UpDelTrans();
+		String mdn = upValue[0];
+		String[] values = upValue[1].split(",", -1);
 		String[] results = result.split(",", -1);	
-		if (new TimeFormat().Date2long(datas[10]) > new TimeFormat().Date2long(results[9])) {
-			if (!(datas[3].equals(results[2]) && datas[4].equals(results[3]))) {
-				Delete delete = new Delete(Bytes.toBytes(results[2] + HbaseInput.lacci_split + results[3]));
-				delete.deleteColumns(HbaseInput.F_byte, Bytes.toBytes(datas[0]));
-				delete.setDurability(Durability.SKIP_WAL);
-				DeleteSet.add(delete);
+		if (new TimeFormat().Date2long(values[9]) > new TimeFormat().Date2long(results[9])) {
+			if (!(values[2].equals(results[2]) && values[3].equals(results[3]))) {
+				List<String[]> DelArrayList = new ArrayList<String[]>();
+				if(upDelTrans.getDelArrayList()!=null){
+					DelArrayList = upDelTrans.getDelArrayList();
+				}
+				
+				DelArrayList.add(new String[]{TableName, mdn, results[2] + HbaseInput.STRING_laccisplit + results[3]});
+				upDelTrans.setDelArrayList(DelArrayList);
 			} else {
-				datas[8] = results[7];
-				datas[9] = results[8];
+				values[7] = results[7];
+				values[8] = results[8];
 			}
 		}else{
-			return Array2String((datas[0]+","+Array2String(results)).split(",",-1));
+			upValue[1] = result;
+			upDelTrans.setUpValue(upValue);
+			return upDelTrans;
 		}
-		return Array2String(datas);
+		upValue[1] = Array2String(values);
+		upDelTrans.setUpValue(upValue);
+		return upDelTrans;
 	}
 
 	public String Array2String(String[] datas) {
