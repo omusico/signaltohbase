@@ -13,7 +13,7 @@ public class HbasePoolOld {
 
 	static {
 		configuration = HBaseConfiguration.create();
-        configuration.set("hbase.zookeeper.quorum","ocdc-dn-03");  
+        configuration.set("hbase.zookeeper.quorum","ocdc-dn-03,ocdc-ser-01,ocdc-dn-22");  
         configuration.set("hbase.zookeeper.property.clientPort","2181");  
         configuration.set("zookeeper.znode.parent","/hbase-unsecure");  
 	}

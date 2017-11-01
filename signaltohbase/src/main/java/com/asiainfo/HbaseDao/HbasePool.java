@@ -17,7 +17,7 @@ public class HbasePool {
 
 	static {
 		configuration = HBaseConfiguration.create();		
-		configuration.set("hbase.zookeeper.quorum", "ocdc-dn-01,ocdc-dn-02,ocdc-dn-03,ocdc-dn-04,ocdc-dn-05");
+		configuration.set("hbase.zookeeper.quorum", "ocdc-dn-03,ocdc-dn-22,ocdc-ser-01");
 		configuration.set("zookeeper.znode.parent", "/hbase-unsecure");
 	}
 	

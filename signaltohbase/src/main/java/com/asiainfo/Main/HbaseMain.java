@@ -1,7 +1,9 @@
 package com.asiainfo.Main;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Condition;
@@ -28,6 +30,9 @@ public class HbaseMain {
 	public static HashMap<String, Integer> mma = new HashMap<String,Integer>();
 	public static int batch = 40000;
 	
+	public static List<Long> timeList = new ArrayList<Long>();
+	public static Map<String, String> timeMap = new LinkedHashMap<String,String>();
+	
 	public final static String TOPIC_CS_LOC_SIGNAL = "LOC_MSG_SIGNAL_KAFUKA";
 	public final static String TOPIC_CS_SMS_SIGNAL = "SMS_MSG_SIGNAL_KAFKA";
 	public final static String TOPIC_CS_VOC_SIGNAL = "VOC_MSG_SIGNAL_KAFKA";
@@ -53,17 +58,24 @@ public class HbaseMain {
 				
 				System.out.println("taskSize "+HbaseDaoThread.taskSize);
 				
-				KafkaMyConsumer kafkaMyConsumerPS = new KafkaMyConsumer(TOPIC_PS_SIGNAL);
-				kafkaMyConsumerPS.setPriority(10);
-				
 		        Runtime.getRuntime().addShutdownHook(new Thread() {
 		            @Override
 		            public void run() {
 		            	System.out.println("ShutdownHook");
-		            	new HbaseInput().HbaseSignalPut(HbaseMain.dataList);
+		            	try {
+							new HbaseInput().HbaseSignalPut(HbaseMain.dataList);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
 		            }
 		        });
+				
+				timeList.add(System.currentTimeMillis());
 		        
+				KafkaMyConsumer kafkaMyConsumerPS = new KafkaMyConsumer(TOPIC_PS_SIGNAL);
+				kafkaMyConsumerPS.setPriority(10);
+				
 				new KafkaMyConsumer(TOPIC_CS_LOC_SIGNAL).start();
 				new KafkaMyConsumer(TOPIC_CS_SMS_SIGNAL).start();
 				new KafkaMyConsumer(TOPIC_CS_VOC_SIGNAL).start();

@@ -53,6 +53,8 @@ public class HbaseDaoThread{
 		Collections.sort(mdnArrayList);
 
 		int taskSizeNum = (mdnArrayList.size()/taskSize)+1;
+		
+
 
 		int mdncount=0;
 		for(String mdn:mdnArrayList){
@@ -89,7 +91,7 @@ public class HbaseDaoThread{
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public GetResultMaps HbaseGetternew(String tableName,List<String[]> upValueList){
-		long timec = System.currentTimeMillis();
+		
 		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
 		ArrayList<Future> list = new ArrayList<Future>(); 
 
@@ -116,9 +118,8 @@ public class HbaseDaoThread{
 			mdncount++;
 		}
 		CountDownLatch latch =new CountDownLatch(taskSize);
+
 		
-		long timea = System.currentTimeMillis();
-		//System.out.println(Thread.currentThread().getName()+" a : "+10000*(timea-timec)/HbaseMain.batch);
 		for(int i=0;i<taskSize;i++){
 			Callable c = new MyCallableget_Version1_2(latch, tableName , allArrayList.get(i)); 
 			Future f = pool.submit(c);  
@@ -130,8 +131,7 @@ public class HbaseDaoThread{
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
-		long timeb = System.currentTimeMillis();
-		//System.out.println(Thread.currentThread().getName()+" b : "+10000*(timeb-timea)/HbaseMain.batch);
+
 		for(Future f:list){
 			try {
 				splitMapList.add((GetResultMaps)f.get());
@@ -148,8 +148,7 @@ public class HbaseDaoThread{
 		}
 		getAllResultMaps.setResultMap(allMapList);
 		getAllResultMaps.setRoamResultMap(allRoamMapList);
-		long timed = System.currentTimeMillis();
-		//System.out.println(Thread.currentThread().getName()+" c : "+10000*(timed-timeb)/HbaseMain.batch);
+		
 		return getAllResultMaps;
 	}
 	
@@ -159,7 +158,6 @@ public class HbaseDaoThread{
 		private Result[] results;
 		private CountDownLatch latch;
 		private ArrayList<Get> GetList = new ArrayList<Get>();
-//		private ArrayList<Get> GetListExist = new ArrayList<Get>();
 		private HashMap<String, byte[]> resultMap = new HashMap<String, byte[]>();
 		private HashMap<String, byte[]> roamResultMap = new HashMap<String, byte[]>();
 	
@@ -171,15 +169,13 @@ public class HbaseDaoThread{
 		
 		public Object call(){
 			try {
-				long timea = System.currentTimeMillis();
 				Table hTable = HbasePool.getHtable(tableName);
 
 				for(String rowKey:rowKeys){
-					Get get = new Get(Bytes.toBytes(rowKey.split("\\^")[0]));
+					Get get = new Get(Bytes.toBytes(rowKey));
 					get.addFamily(HbaseInput.BYTE_f);
 					GetList.add(get);
 				}
-				long timeb = System.currentTimeMillis();
 				//System.out.println(Thread.currentThread().getName()+" 111 : "+10000*(timeb-timea)/HbaseMain.batch);
 //				boolean[] booleans = hTable.existsAll(GetList);
 //				long timec = System.currentTimeMillis();
@@ -193,11 +189,8 @@ public class HbaseDaoThread{
 //					}
 //				}
 				
-				long timed = System.currentTimeMillis();
-				//System.out.println(Thread.currentThread().getName()+" 333 : "+10000*(timed-timeb)/HbaseMain.batch);
+				
 				results = hTable.get(GetList);
-				long timee = System.currentTimeMillis();
-				//System.out.println(Thread.currentThread().getName()+" 444 : "+10000*(timee-timed)/HbaseMain.batch);
 
 				hTable.close();
 				
@@ -576,13 +569,17 @@ public class HbaseDaoThread{
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void Hbasedelete(String tableName,Map<String,String> DeleteSet){
-		ExecutorService pool = Executors.newFixedThreadPool(taskSize); 
+		int tasksize = taskSize;
+		if(DeleteSet.size()<taskSize){
+			tasksize = 1;
+		}
+		ExecutorService pool = Executors.newFixedThreadPool(tasksize); 
 		ArrayList<Future> list = new ArrayList<Future>(); 
 
 		Set<Delete> oneSet = new HashSet<Delete>();
 		ArrayList<ArrayList<Delete>> allSet = new ArrayList<ArrayList<Delete>>();
 		
-		for(int i=0;i<taskSize;i++){
+		for(int i=0;i<tasksize;i++){
 			allSet.add(new ArrayList<Delete>());
 		}
 		
@@ -598,8 +595,9 @@ public class HbaseDaoThread{
 			delete.setDurability(Durability.SKIP_WAL);
 			oneSet.add(delete);
 		}
+		int taskSizeNum = (oneSet.size()/tasksize)+1;
 		
-		int taskSizeNum = (oneSet.size()/taskSize)+1;
+
 
 		int count=0;
 		for(Delete one:oneSet){
@@ -607,8 +605,8 @@ public class HbaseDaoThread{
 			count++;
 		}
 		
-		CountDownLatch latch =new CountDownLatch(taskSize);
-		for(int i=0;i<taskSize;i++){
+		CountDownLatch latch =new CountDownLatch(tasksize);
+		for(int i=0;i<tasksize;i++){
 			Callable c = new MyCallabledelete(latch,tableName, allSet.get(i)); 
 			Future f = pool.submit(c);  
 			list.add(f);  
