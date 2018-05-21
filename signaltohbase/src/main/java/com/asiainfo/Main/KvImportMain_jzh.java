@@ -8,7 +8,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Set;
 
@@ -20,6 +19,7 @@ import java.util.List;
 import com.asiainfo.HbaseDao.HbaseDao;
 import com.asiainfo.HbaseDao.HbaseDaoThread;
 import com.asiainfo.Util.Log4JUtil;
+import com.asiainfo.Util.ParamUtil;
 
 public class KvImportMain_jzh {
 	private static Logger LOG = Log4JUtil.getLogger(KvImportMain_jzh.class);
@@ -124,6 +124,7 @@ public class KvImportMain_jzh {
 	}
 	
 	public static void exemain(List<String> args) {
+		ParamUtil paramUtil = ParamUtil.getInstance();
 		long a = System.currentTimeMillis();
 		KvImportMain_jzh kim = new KvImportMain_jzh();
 
@@ -142,8 +143,8 @@ public class KvImportMain_jzh {
 		} else if (args.size()  >= 3) {
 			inputPath = args.get(0);
 			outputPath = args.get(1);
-			HbaseDaoThread.taskSize = Integer.parseInt(args.get(2));
-			LOG.info("hbase 并发处理数为: "+HbaseDaoThread.taskSize);
+			paramUtil.DEFAULT_POOL_SIZE = Integer.parseInt(args.get(2));
+			LOG.info("hbase 并发处理数为: "+paramUtil.DEFAULT_POOL_SIZE);
 		}
 		LOG.info("输入路径为: " + inputPath + ";输出路径为: " + outputPath);
 		kim.getValueByFile(inputPath, outputPath);

@@ -6,14 +6,14 @@ import java.util.List;
 public class UpDelTrans {
 	
 	//upValue:{mdn,value,roam|local}
-	private String[] upValue = new String[3];	
+	private SignalBean signalBean = new SignalBean();	
 	private List<String[]> delArrayList = new ArrayList<String[]>();
 	
-	public String[] getUpValue() {
-		return upValue;
+	public SignalBean getSignalBean() {
+		return signalBean;
 	}
-	public void setUpValue(String[] upValue) {
-		this.upValue = upValue;
+	public void setSignalBean(SignalBean signalBean) {
+		this.signalBean = signalBean;
 	}
 	public List<String[]> getDelArrayList() {
 		return delArrayList;

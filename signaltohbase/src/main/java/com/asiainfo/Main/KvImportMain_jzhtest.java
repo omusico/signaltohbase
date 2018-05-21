@@ -7,12 +7,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Set;
-
-import org.apache.hadoop.hbase.client.Delete;
 
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +17,7 @@ import java.util.Map;
 
 import com.asiainfo.HbaseDao.HbaseDao;
 import com.asiainfo.HbaseDao.HbaseDaoThread;
+import com.asiainfo.Util.ParamUtil;
 
 public class KvImportMain_jzhtest {
 
@@ -56,10 +54,10 @@ public class KvImportMain_jzhtest {
 						
 						System.out.println("处理共 "+sSet.size()+" 条lacci");
 						HbaseDaoThread hbaseDaoThread = new HbaseDaoThread();
-						System.out.println(HbaseDaoThread.taskSize);
+
 						Map<String, Set<String>> datas = hbaseDaoThread.HbaseIndexGetter1(HbaseDao.TABLE_NAME_INDEX, sSet);
 
-						ArrayList<Delete> del = new ArrayList<Delete>();
+//						ArrayList<Delete> del = new ArrayList<Delete>();
 						
 						int allt=0;
 						int allf=0;
@@ -151,20 +149,21 @@ public class KvImportMain_jzhtest {
 		return outputFileName;
 	}
 
-	private void writeToFile(BufferedWriter bw,Set<String> set){
-		try {
-			for (String txt:set) {
-				bw.write(txt);
-				bw.newLine();
-			}
-			bw.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-	}
+//	private void writeToFile(BufferedWriter bw,Set<String> set){
+//		try {
+//			for (String txt:set) {
+//				bw.write(txt);
+//				bw.newLine();
+//			}
+//			bw.flush();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//		
+//	}
 	
 	public static void exemain(List<String> args)  {
+		ParamUtil paramUtil = ParamUtil.getInstance();
 		long a = System.currentTimeMillis();
 		KvImportMain_jzhtest kim = new KvImportMain_jzhtest();
 	
@@ -183,7 +182,7 @@ public class KvImportMain_jzhtest {
 		} else if (args.size() >= 3) {
 			inputPath = args.get(0);
 			outputPath = args.get(1);
-			HbaseDaoThread.taskSize=Integer.parseInt(args.get(2));
+			paramUtil.DEFAULT_POOL_SIZE=Integer.parseInt(args.get(2));
 		}
 		System.out.println("输入路径为：" + inputPath + ";输出路径为：" + outputPath);
 		kim.getValueByFile(inputPath, outputPath);

@@ -14,16 +14,19 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.filter.SubstringComparator;
-import org.apache.hadoop.hbase.util.Bytes; 
+import org.apache.hadoop.hbase.util.Bytes;
+
+import com.asiainfo.Util.ParamUtil; 
 
 public class HbaseDao {
 	public static Configuration conf = HBaseConfiguration.create();
 	public static ArrayList<Put> puts = new ArrayList<Put>();
 	
-	public final static String TABLE_NAME = "ZJBDP:signal";
-	public final static String TABLE_NAME_INDEX = "ZJBDP:signalindex";
-	public final static String TABLE_ROAM_NAME = "ZJBDP:roamsignal";
-	public final static String TABLE_ROAM_NAME_INDEX = "ZJBDP:roamsignalindex";
+	
+	public final static String TABLE_NAME = ParamUtil.TABLE_NAME;
+	public final static String TABLE_NAME_INDEX = ParamUtil.TABLE_NAME_INDEX;
+	public final static String TABLE_ROAM_NAME = ParamUtil.TABLE_ROAM_NAME;
+	public final static String TABLE_ROAM_NAME_INDEX = ParamUtil.TABLE_ROAM_NAME_INDEX;
 	public final static long WRITEBUFFERSIZE = 5*1024*1024;
 	
 
@@ -34,6 +37,25 @@ public class HbaseDao {
 		conf.set("zookeeper.znode.parent", "/hbase-unsecure");
 	}
 
+	
+	public void Mutate(){
+		Table hTable = HbasePool.getHtable("ZJLT:signal");	
+		BufferedMutator table = HbasePool.getMutator("ZJLT:signal");
+		Put p = new Put(Bytes.toBytes("TEST"));
+		p.add(Bytes.toBytes("f"), Bytes.toBytes("cq1"), Bytes.toBytes("v1"));
+		p.add(Bytes.toBytes("f"), Bytes.toBytes("cq2"), Bytes.toBytes("v2"));
+		p.add(Bytes.toBytes("f"), Bytes.toBytes("cq3"), Bytes.toBytes("v3"));
+//		Bytes.toBytes(Long.parseLong("f"));
+		List<Mutation> mutations = new ArrayList<Mutation>();
+		mutations.add(p);
+        try {
+			table.mutate(mutations);
+			table.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+	}
 	
 	public Map<String,HTableInterface> MyInit(String[] tablenames){
 		HashMap<String, HTableInterface> MyhTables = new HashMap<String, HTableInterface>();
@@ -60,7 +82,11 @@ public class HbaseDao {
 	
 	public void MyBufferFlush(List<HTableInterface> htInterfaces){
 		for(HTableInterface htInterface:htInterfaces){
-//				htInterface.flushCommits();
+				try {
+					htInterface.flushCommits();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 	}
 	
@@ -101,6 +127,15 @@ public class HbaseDao {
 			rowPut.add(columnFamily.getBytes(), key.getBytes(), ts, value.getBytes());
 			rowPut.setDurability(Durability.SKIP_WAL);
 			htable.put(rowPut);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void putRow(HTableInterface htable, Put put) {
+		try {
+			put.setDurability(Durability.SKIP_WAL);
+			htable.put(put);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

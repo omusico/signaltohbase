@@ -3,8 +3,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.asiainfo</groupId>
-  <artifactId>RealTimeSignal</artifactId>
-  <version>0.0.1</version>
+  <artifactId>RealTimeSignalConTestImsi</artifactId>
+  <version>0.0.3</version>
   <packaging>jar</packaging>
 
   <name>CSsignal</name>
@@ -81,11 +81,11 @@
       <version>5.1.2</version>
     </dependency>
     
-   <!--   <dependency>
-  <groupId>com.google.guava</groupId>
-  <artifactId>guava</artifactId>
-  <version>20.0-rc1</version>
-</dependency>-->
+    <dependency>
+       <groupId>com.google.guava</groupId>
+       <artifactId>guava</artifactId>
+       <version>20.0-rc1</version>
+    </dependency>
 
   </dependencies>
 	<build>

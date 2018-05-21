@@ -1,33 +1,41 @@
 package com.asiainfo.KafkaDao;
 
-import java.util.Properties;
+import java.util.*;
 
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.*;
 
-/**
- * @author leicui bourne_cui@163.com
- */
-public class KafkaMyProducer extends Thread {
-	private final Producer<String, String> producer;
-	private final String topic;
-	private final Properties props = new Properties();
 
-	public KafkaMyProducer(String topic) {
-		props.put("zookeeper.connect", "132.151.46.79:2181");
-		props.put("serializer.class", "kafka.serializer.StringEncoder");
-		props.put("metadata.broker.list", "132.151.46.79:9092");
-		producer = new Producer<String, String>(new ProducerConfig(props));
-		this.topic = topic;
-	}
 
-	@Override
-	public void run() {
-		for (int i = 1; i < 5; i++) {
-			KeyedMessage<String, String> km = new KeyedMessage<String, String>(topic, Integer.toString(i),
-					i + ":" + i * 100);
-			producer.send(km);
+public class KafkaMyProducer {
+    private final Producer<String, String> producer;
+    private final String topic;
+    private final List<String> msgSet;
+    
+    public KafkaMyProducer(String topic, List<String> msgSet) {
+        Properties properties = new Properties();
+        properties.put("bootstrap.servers", "192.168.1.32:6667,192.168.1.33:6667,192.168.1.34:6667,192.168.1.18:6667");//broker 集群地址
+        properties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");//key 序列号方式
+        properties.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");//value 序列号方式
+        
+        this.producer = new KafkaProducer<String, String>(properties);
+        this.topic = topic;
+        this.msgSet = msgSet;
+    }
+    
+//    @Override
+//    public void run() {
+//        for(String msg:msgSet){
+//		    System.out.println(msg);
+//		    producer.send(new ProducerRecord<String, String>(this.topic,msg));
+//		}
+//    }
+    
+    public void setSend(){
+        for(String msg:msgSet){
+		    producer.send(new ProducerRecord<String, String>(this.topic,msg));
 		}
-	}
+	    System.out.println("setSend complete!");
+    }
+
+
 }

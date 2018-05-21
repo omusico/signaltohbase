@@ -19,7 +19,9 @@ import java.util.Map;
 
 import com.asiainfo.HbaseDao.HbaseDao;
 import com.asiainfo.HbaseDao.HbaseDaoThread;
+import com.asiainfo.Util.DataFormat;
 import com.asiainfo.Util.Log4JUtil;
+import com.asiainfo.Util.ParamUtil;
 	
 public class KvImportMain_sfz {
 	private static Logger LOG = Log4JUtil.getLogger(KvImportMain_sfz.class);
@@ -73,15 +75,15 @@ public class KvImportMain_sfz {
 								if(!(signal.get(mdn)==null)){
 									String result = new String(signal.get(mdn));
 									String[] paras = result.split(",",-1);
-									String lacci  = paras[2]+"|"+paras[3];
+									String lacci  = paras[DataFormat.lac]+"|"+paras[DataFormat.ci];
 									if(data_lacci.equals(lacci)){
 										resultSet.add(new String(
 												new StringBuffer()
 												.append(data_id).append("^")
 												.append(mdn).append("^")
-												.append(paras[0]).append("^")
-												.append(getlacLocShi(paras[1])).append("^")
-												.append(paras[1])
+												.append(paras[DataFormat.area]).append("^")
+												.append(getlacLocShi(paras[DataFormat.roam])).append("^")
+												.append(paras[DataFormat.roam])
 												));
 									}
 								}
@@ -177,6 +179,7 @@ public class KvImportMain_sfz {
 	}
 	
 	public static void exemain(List<String> args) {
+		ParamUtil paramUtil = ParamUtil.getInstance();
 		long a = System.currentTimeMillis();
 		KvImportMain_sfz kim = new KvImportMain_sfz();
 
@@ -195,8 +198,8 @@ public class KvImportMain_sfz {
 		} else if (args.size() >= 3) {
 			inputPath = args.get(0);
 			outputPath = args.get(1);
-			HbaseDaoThread.taskSize = Integer.parseInt(args.get(2));
-			LOG.info("hbase 并发处理数为: "+HbaseDaoThread.taskSize);
+			paramUtil.DEFAULT_POOL_SIZE = Integer.parseInt(args.get(2));
+			LOG.info("hbase 并发处理数为: "+paramUtil.DEFAULT_POOL_SIZE);
 		}
 		LOG.info("输入路径为: " + inputPath + ";输出路径为: " + outputPath);
 		kim.getValueByFile(inputPath, outputPath);
